@@ -35,7 +35,7 @@ EPOCHS = 150                              # 更多迭代
 LEARNING_RATE = 3e-2                      # SGD 从零训练 CNN 常用 0.01~0.1
 IMG_SIZE = 160                            # 降分辨率，减少过拟合，加速训练
 MODEL_NAME = "yoga_cnn"                   # "yoga_cnn" / "resnet50" / "resnet18"
-MODEL_SCALE = 1.0               # 模型缩放因子: 0.5=小型, 1.0=标准, 2.0=大型
+MODEL_SCALE = 1.5               # 模型缩放因子: 0.5=小型, 1.0=标准, 2.0=大型
 WEIGHT_DECAY = 1e-3
 MOMENTUM = 0.9
 LABEL_SMOOTHING = 0.1
