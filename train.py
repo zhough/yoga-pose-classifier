@@ -35,8 +35,9 @@ EPOCHS = 120                              # 从零训练需要更多 epoch
 LEARNING_RATE = 1e-2                      # SGD 用更高的初始学习率
 IMG_SIZE = 224
 MODEL_NAME = "yoga_cnn"                   # "yoga_cnn" / "resnet50" / "resnet18"
-WEIGHT_DECAY = 5e-4
+WEIGHT_DECAY = 1e-3
 MOMENTUM = 0.9
+LABEL_SMOOTHING = 0.1
 
 
 def get_device():
@@ -67,6 +68,8 @@ DEVICE = get_device()
 train_transforms = transforms.Compose([
     transforms.Resize((IMG_SIZE, IMG_SIZE)),
     transforms.RandomHorizontalFlip(p=0.5),
+    transforms.RandomRotation(degrees=20),
+    transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1),
     transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406],
@@ -94,6 +97,7 @@ class YogaCNN(nn.Module):
         self.conv2 = nn.Conv2d(64, 64, kernel_size=3, padding=1)
         self.bn2 = nn.BatchNorm2d(64)
         self.pool1 = nn.MaxPool2d(2, 2)
+        self.drop1 = nn.Dropout2d(0.1)
 
         # Block 2
         self.conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
@@ -101,6 +105,7 @@ class YogaCNN(nn.Module):
         self.conv4 = nn.Conv2d(128, 128, kernel_size=3, padding=1)
         self.bn4 = nn.BatchNorm2d(128)
         self.pool2 = nn.MaxPool2d(2, 2)
+        self.drop2 = nn.Dropout2d(0.1)
 
         # Block 3
         self.conv5 = nn.Conv2d(128, 256, kernel_size=3, padding=1)
@@ -108,6 +113,7 @@ class YogaCNN(nn.Module):
         self.conv6 = nn.Conv2d(256, 256, kernel_size=3, padding=1)
         self.bn6 = nn.BatchNorm2d(256)
         self.pool3 = nn.MaxPool2d(2, 2)
+        self.drop3 = nn.Dropout2d(0.2)
 
         # Block 4
         self.conv7 = nn.Conv2d(256, 512, kernel_size=3, padding=1)
@@ -115,6 +121,7 @@ class YogaCNN(nn.Module):
         self.conv8 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
         self.bn8 = nn.BatchNorm2d(512)
         self.pool4 = nn.MaxPool2d(2, 2)
+        self.drop4 = nn.Dropout2d(0.2)
 
         # 全局平均池化 + 全连接
         self.gap = nn.AdaptiveAvgPool2d((1, 1))
@@ -128,21 +135,25 @@ class YogaCNN(nn.Module):
         x = F.relu(self.bn1(self.conv1(x)))
         x = F.relu(self.bn2(self.conv2(x)))
         x = self.pool1(x)
+        x = self.drop1(x)
 
         # Block 2
         x = F.relu(self.bn3(self.conv3(x)))
         x = F.relu(self.bn4(self.conv4(x)))
         x = self.pool2(x)
+        x = self.drop2(x)
 
         # Block 3
         x = F.relu(self.bn5(self.conv5(x)))
         x = F.relu(self.bn6(self.conv6(x)))
         x = self.pool3(x)
+        x = self.drop3(x)
 
         # Block 4
         x = F.relu(self.bn7(self.conv7(x)))
         x = F.relu(self.bn8(self.conv8(x)))
         x = self.pool4(x)
+        x = self.drop4(x)
 
         # 分类头
         x = self.gap(x)
@@ -239,7 +250,7 @@ def main():
         model.fc = nn.Linear(in_features, num_classes)
 
     model = model.to(DEVICE)
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss(label_smoothing=LABEL_SMOOTHING)
     optimizer = optim.SGD(model.parameters(), lr=LEARNING_RATE,
                           momentum=MOMENTUM, weight_decay=WEIGHT_DECAY)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(
