@@ -26,7 +26,29 @@ BATCH_SIZE = 64
 EPOCHS = 50
 LEARNING_RATE = 1e-3
 IMG_SIZE = 224
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+def get_device():
+    """安全检测可用设备，GPU 不兼容时回退 CPU"""
+    if not torch.cuda.is_available():
+        return torch.device("cpu")
+
+    try:
+        # 用一次 conv2d 验证 GPU 算力兼容性
+        x = torch.randn(1, 3, 64, 64, device="cuda")
+        w = torch.randn(8, 3, 3, 3, device="cuda")
+        _ = torch.nn.functional.conv2d(x, w)
+        del x, w
+        torch.cuda.empty_cache()
+        return torch.device("cuda")
+    except Exception as e:
+        print(f"⚠ GPU 不兼容: {e}")
+        print("自动回退到 CPU 训练")
+        torch.cuda.empty_cache()
+        return torch.device("cpu")
+
+
+DEVICE = get_device()
 # ===============================================
 
 
