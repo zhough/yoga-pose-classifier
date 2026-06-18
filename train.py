@@ -38,7 +38,9 @@ MODEL_NAME = "yoga_cnn"                   # "yoga_cnn" / "resnet50" / "resnet18"
 WEIGHT_DECAY = 1e-3
 MOMENTUM = 0.9
 LABEL_SMOOTHING = 0.1
-MIXUP_ALPHA = 0.2        # MixUp 强度，0=关闭
+# === 对比实验：MixUp（取消注释即可启用）===
+# MIXUP_ALPHA = 0.2
+MIXUP_ALPHA = 0            # 0 = 关闭 MixUp
 
 
 def get_device():
@@ -156,24 +158,25 @@ class YogaCNN(nn.Module):
 
 
 # ==================== 训练函数 ====================
-def mixup_data(x, y, alpha):
-    """MixUp 数据增强：将两张图按比例混合"""
-    if alpha > 0:
-        lam = torch.distributions.Beta(alpha, alpha).sample().item()
-    else:
-        lam = 1.0
-
-    batch_size = x.size(0)
-    index = torch.randperm(batch_size, device=x.device)
-
-    mixed_x = lam * x + (1 - lam) * x[index]
-    y_a, y_b = y, y[index]
-    return mixed_x, y_a, y_b, lam
-
-
-def mixup_criterion(criterion, pred, y_a, y_b, lam):
-    """MixUp 损失：两路损失的加权和"""
-    return lam * criterion(pred, y_a) + (1 - lam) * criterion(pred, y_b)
+# === 对比实验：MixUp（取消注释即可启用）===
+# def mixup_data(x, y, alpha):
+#     """MixUp 数据增强：将两张图按比例混合"""
+#     if alpha > 0:
+#         lam = torch.distributions.Beta(alpha, alpha).sample().item()
+#     else:
+#         lam = 1.0
+#
+#     batch_size = x.size(0)
+#     index = torch.randperm(batch_size, device=x.device)
+#
+#     mixed_x = lam * x + (1 - lam) * x[index]
+#     y_a, y_b = y, y[index]
+#     return mixed_x, y_a, y_b, lam
+#
+#
+# def mixup_criterion(criterion, pred, y_a, y_b, lam):
+#     """MixUp 损失：两路损失的加权和"""
+#     return lam * criterion(pred, y_a) + (1 - lam) * criterion(pred, y_b)
 
 
 def train_one_epoch(model, loader, criterion, optimizer):
@@ -186,26 +189,20 @@ def train_one_epoch(model, loader, criterion, optimizer):
     for images, labels in pbar:
         images, labels = images.to(DEVICE), labels.to(DEVICE)
 
-        # MixUp
-        if MIXUP_ALPHA > 0:
-            images, labels_a, labels_b, lam = mixup_data(images, labels, MIXUP_ALPHA)
-            mixed = True
-        else:
-            mixed = False
+        # === 对比实验：MixUp（取消注释即可启用）===
+        # if MIXUP_ALPHA > 0:
+        #     images, labels_a, labels_b, lam = mixup_data(images, labels, MIXUP_ALPHA)
 
         optimizer.zero_grad()
         outputs = model(images)
 
-        if mixed:
-            loss = mixup_criterion(criterion, outputs, labels_a, labels_b, lam)
-            # 准确率用原始 labels 估算
-            _, preds = torch.max(outputs, 1)
-            correct += (lam * (preds == labels_a).float() +
-                        (1 - lam) * (preds == labels_b).float()).sum().item()
-        else:
-            loss = criterion(outputs, labels)
-            _, preds = torch.max(outputs, 1)
-            correct += (preds == labels).sum().item()
+        # if MIXUP_ALPHA > 0:
+        #     loss = mixup_criterion(criterion, outputs, labels_a, labels_b, lam)
+        # else:
+        #     loss = criterion(outputs, labels)
+        loss = criterion(outputs, labels)
+        _, preds = torch.max(outputs, 1)
+        correct += (preds == labels).sum().item()
 
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
