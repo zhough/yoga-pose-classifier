@@ -239,6 +239,11 @@ def main():
 
     # ============ SwanLab 初始化 ============
     if SWANLAB_AVAILABLE:
+        # 优先从环境变量读取 API Key（Kaggle Secrets / export）
+        api_key = os.environ.get("SWANLAB_API_KEY", "")
+        if api_key:
+            swanlab.login(api_key=api_key)
+
         swanlab.init(
             project="yoga-pose-classifier",
             experiment_name="cnn_baseline",
