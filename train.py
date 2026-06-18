@@ -101,14 +101,15 @@ class ConvBlock(nn.Module):
         self.pool = nn.MaxPool2d(2, 2)
         self.dropout = nn.Dropout2d(dropout) if dropout > 0 else nn.Identity()
 
-        # 1×1 卷积匹配残差通道数 + 下采样
-        self.skip = nn.Sequential(
-            nn.Conv2d(in_c, out_c, kernel_size=1, stride=2, bias=False),
-            nn.BatchNorm2d(out_c),
-        ) if in_c != out_c else nn.Sequential(
-            nn.Conv2d(in_c, out_c, kernel_size=1, stride=2, bias=False),
-            nn.BatchNorm2d(out_c),
-        )
+        # skip: 1×1 conv 调通道（in_c≠out_c）+ AvgPool2d 下采样
+        if in_c != out_c:
+            self.skip = nn.Sequential(
+                nn.Conv2d(in_c, out_c, kernel_size=1, bias=False),
+                nn.BatchNorm2d(out_c),
+                nn.AvgPool2d(2, 2),
+            )
+        else:
+            self.skip = nn.AvgPool2d(2, 2)
 
     def forward(self, x):
         residual = self.skip(x)
