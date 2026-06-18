@@ -307,7 +307,7 @@ def main():
         train_loss, train_acc = train_one_epoch(model, train_loader, criterion, optimizer)
         val_loss, val_acc = validate(model, val_loader, criterion)
 
-        scheduler.step(val_loss)
+        scheduler.step()
 
         current_lr = optimizer.param_groups[0]["lr"]
 
