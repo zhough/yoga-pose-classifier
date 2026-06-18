@@ -7,6 +7,14 @@ from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 from tqdm import tqdm
 
+# SwanLab 实验追踪（未安装时安全跳过）
+try:
+    import swanlab
+    SWANLAB_AVAILABLE = True
+except ImportError:
+    SWANLAB_AVAILABLE = False
+    print("⚠ SwanLab 未安装，跳过实验记录。pip install swanlab")
+
 # ==================== 配置区 ====================
 IS_KAGGLE = os.environ.get("KAGGLE_KERNEL_RUN_TYPE", "") != ""
 
@@ -229,11 +237,31 @@ def main():
         optimizer, mode="min", factor=0.5, patience=5
     )
 
+    # ============ SwanLab 初始化 ============
+    if SWANLAB_AVAILABLE:
+        swanlab.init(
+            project="yoga-pose-classifier",
+            experiment_name="cnn_baseline",
+            config={
+                "architecture": "YogaCNN",
+                "num_classes": len(train_dataset.classes),
+                "batch_size": BATCH_SIZE,
+                "epochs": EPOCHS,
+                "learning_rate": LEARNING_RATE,
+                "img_size": IMG_SIZE,
+                "optimizer": "Adam",
+                "scheduler": "ReduceLROnPlateau",
+                "train_samples": len(train_dataset),
+                "val_samples": len(val_dataset),
+                "device": str(DEVICE),
+            },
+            logdir=os.path.join(SAVE_DIR, "swanlab"),
+        )
+
     print(f"\n模型参数量: {sum(p.numel() for p in model.parameters()) / 1e6:.2f}M")
     print("开始训练...\n")
 
     best_acc = 0.0
-    history = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
 
     for epoch in range(1, EPOCHS + 1):
         print(f"===== Epoch {epoch}/{EPOCHS} =====")
@@ -243,14 +271,21 @@ def main():
 
         scheduler.step(val_loss)
 
-        history["train_loss"].append(train_loss)
-        history["train_acc"].append(train_acc)
-        history["val_loss"].append(val_loss)
-        history["val_acc"].append(val_acc)
+        current_lr = optimizer.param_groups[0]["lr"]
 
         print(f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.4f}")
         print(f"Val   Loss: {val_loss:.4f} | Val   Acc: {val_acc:.4f}")
-        print(f"当前学习率: {optimizer.param_groups[0]['lr']:.2e}")
+        print(f"当前学习率: {current_lr:.2e}")
+
+        # SwanLab 记录
+        if SWANLAB_AVAILABLE:
+            swanlab.log({
+                "train/loss": train_loss,
+                "train/acc": train_acc,
+                "val/loss": val_loss,
+                "val/acc": val_acc,
+                "train/lr": current_lr,
+            })
 
         # 保存最佳模型
         if val_acc > best_acc:
@@ -286,6 +321,10 @@ def main():
     with open(os.path.join(SAVE_DIR, "classes.txt"), "w", encoding="utf-8") as f:
         for cls in train_dataset.classes:
             f.write(cls + "\n")
+
+    # 结束 SwanLab
+    if SWANLAB_AVAILABLE:
+        swanlab.finish()
 
 
 if __name__ == "__main__":
