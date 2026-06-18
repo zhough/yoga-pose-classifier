@@ -32,7 +32,7 @@ else:
 NUM_CLASSES = 98
 BATCH_SIZE = 64
 EPOCHS = 120                              # 从零训练需要更多 epoch
-LEARNING_RATE = 1e-2                      # SGD 用更高的初始学习率
+LEARNING_RATE = 3e-2                      # SGD 从零训练 CNN 常用 0.01~0.1
 IMG_SIZE = 224
 MODEL_NAME = "yoga_cnn"                   # "yoga_cnn" / "resnet50" / "resnet18"
 WEIGHT_DECAY = 1e-3
@@ -254,7 +254,7 @@ def main():
     optimizer = optim.SGD(model.parameters(), lr=LEARNING_RATE,
                           momentum=MOMENTUM, weight_decay=WEIGHT_DECAY)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(
-        optimizer, T_max=EPOCHS, eta_min=1e-5
+        optimizer, T_max=EPOCHS, eta_min=1e-4
     )
 
     # ============ SwanLab 初始化 ============
