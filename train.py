@@ -239,8 +239,19 @@ def main():
 
     # ============ SwanLab 初始化 ============
     if SWANLAB_AVAILABLE:
-        # 优先从环境变量读取 API Key（Kaggle Secrets / export）
-        api_key = os.environ.get("SWANLAB_API_KEY", "")
+        api_key = ""
+
+        # 尝试从 Kaggle Secrets 读取
+        try:
+            from kaggle_secrets import UserSecretsClient
+            api_key = UserSecretsClient().get_secret("SWANLAB_API_KEY")
+        except Exception:
+            pass
+
+        # 回退：从环境变量读取（本地使用）
+        if not api_key:
+            api_key = os.environ.get("SWANLAB_API_KEY", "")
+
         if api_key:
             swanlab.login(api_key=api_key)
 
