@@ -31,13 +31,14 @@ else:
 
 NUM_CLASSES = 98
 BATCH_SIZE = 64
-EPOCHS = 120                              # 从零训练需要更多 epoch
+EPOCHS = 150                              # 更多迭代
 LEARNING_RATE = 3e-2                      # SGD 从零训练 CNN 常用 0.01~0.1
-IMG_SIZE = 224
+IMG_SIZE = 160                            # 降分辨率，减少过拟合，加速训练
 MODEL_NAME = "yoga_cnn"                   # "yoga_cnn" / "resnet50" / "resnet18"
 WEIGHT_DECAY = 1e-3
 MOMENTUM = 0.9
 LABEL_SMOOTHING = 0.1
+MIXUP_ALPHA = 0.2        # MixUp 强度，0=关闭
 
 
 def get_device():
@@ -85,45 +86,55 @@ val_transforms = transforms.Compose([
 
 
 # ==================== CNN 模型 ====================
+class ConvBlock(nn.Module):
+    """带残差连接的卷积块"""
+
+    def __init__(self, in_c, out_c, dropout=0.0):
+        super().__init__()
+        self.conv1 = nn.Conv2d(in_c, out_c, kernel_size=3, padding=1)
+        self.bn1 = nn.BatchNorm2d(out_c)
+        self.conv2 = nn.Conv2d(out_c, out_c, kernel_size=3, padding=1)
+        self.bn2 = nn.BatchNorm2d(out_c)
+        self.pool = nn.MaxPool2d(2, 2)
+        self.dropout = nn.Dropout2d(dropout) if dropout > 0 else nn.Identity()
+
+        # 1×1 卷积匹配残差通道数 + 下采样
+        self.skip = nn.Sequential(
+            nn.Conv2d(in_c, out_c, kernel_size=1, stride=2, bias=False),
+            nn.BatchNorm2d(out_c),
+        ) if in_c != out_c else nn.Sequential(
+            nn.Conv2d(in_c, out_c, kernel_size=1, stride=2, bias=False),
+            nn.BatchNorm2d(out_c),
+        )
+
+    def forward(self, x):
+        residual = self.skip(x)
+        x = F.relu(self.bn1(self.conv1(x)))
+        x = F.relu(self.bn2(self.conv2(x)))
+        x = self.pool(x)
+        x = self.dropout(x)
+        x = x + residual
+        return x
+
+
 class YogaCNN(nn.Module):
-    """自定义 CNN 用于瑜伽体式分类"""
+    """带残差连接的 CNN 用于瑜伽体式分类"""
 
     def __init__(self, num_classes=NUM_CLASSES):
         super().__init__()
 
-        # Block 1
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=3, padding=1)
-        self.bn1 = nn.BatchNorm2d(64)
-        self.conv2 = nn.Conv2d(64, 64, kernel_size=3, padding=1)
-        self.bn2 = nn.BatchNorm2d(64)
-        self.pool1 = nn.MaxPool2d(2, 2)
-        self.drop1 = nn.Dropout2d(0.1)
+        self.stem = nn.Sequential(
+            nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(3, 2, 1),
+        )
 
-        # Block 2
-        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
-        self.bn3 = nn.BatchNorm2d(128)
-        self.conv4 = nn.Conv2d(128, 128, kernel_size=3, padding=1)
-        self.bn4 = nn.BatchNorm2d(128)
-        self.pool2 = nn.MaxPool2d(2, 2)
-        self.drop2 = nn.Dropout2d(0.1)
+        self.block1 = ConvBlock(64, 64, dropout=0.0)
+        self.block2 = ConvBlock(64, 128, dropout=0.1)
+        self.block3 = ConvBlock(128, 256, dropout=0.2)
+        self.block4 = ConvBlock(256, 512, dropout=0.2)
 
-        # Block 3
-        self.conv5 = nn.Conv2d(128, 256, kernel_size=3, padding=1)
-        self.bn5 = nn.BatchNorm2d(256)
-        self.conv6 = nn.Conv2d(256, 256, kernel_size=3, padding=1)
-        self.bn6 = nn.BatchNorm2d(256)
-        self.pool3 = nn.MaxPool2d(2, 2)
-        self.drop3 = nn.Dropout2d(0.2)
-
-        # Block 4
-        self.conv7 = nn.Conv2d(256, 512, kernel_size=3, padding=1)
-        self.bn7 = nn.BatchNorm2d(512)
-        self.conv8 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
-        self.bn8 = nn.BatchNorm2d(512)
-        self.pool4 = nn.MaxPool2d(2, 2)
-        self.drop4 = nn.Dropout2d(0.2)
-
-        # 全局平均池化 + 全连接
         self.gap = nn.AdaptiveAvgPool2d((1, 1))
         self.fc1 = nn.Linear(512, 256)
         self.bn_fc = nn.BatchNorm1d(256)
@@ -131,31 +142,11 @@ class YogaCNN(nn.Module):
         self.fc2 = nn.Linear(256, num_classes)
 
     def forward(self, x):
-        # Block 1
-        x = F.relu(self.bn1(self.conv1(x)))
-        x = F.relu(self.bn2(self.conv2(x)))
-        x = self.pool1(x)
-        x = self.drop1(x)
-
-        # Block 2
-        x = F.relu(self.bn3(self.conv3(x)))
-        x = F.relu(self.bn4(self.conv4(x)))
-        x = self.pool2(x)
-        x = self.drop2(x)
-
-        # Block 3
-        x = F.relu(self.bn5(self.conv5(x)))
-        x = F.relu(self.bn6(self.conv6(x)))
-        x = self.pool3(x)
-        x = self.drop3(x)
-
-        # Block 4
-        x = F.relu(self.bn7(self.conv7(x)))
-        x = F.relu(self.bn8(self.conv8(x)))
-        x = self.pool4(x)
-        x = self.drop4(x)
-
-        # 分类头
+        x = self.stem(x)
+        x = self.block1(x)
+        x = self.block2(x)
+        x = self.block3(x)
+        x = self.block4(x)
         x = self.gap(x)
         x = torch.flatten(x, 1)
         x = F.relu(self.bn_fc(self.fc1(x)))
@@ -165,6 +156,26 @@ class YogaCNN(nn.Module):
 
 
 # ==================== 训练函数 ====================
+def mixup_data(x, y, alpha):
+    """MixUp 数据增强：将两张图按比例混合"""
+    if alpha > 0:
+        lam = torch.distributions.Beta(alpha, alpha).sample().item()
+    else:
+        lam = 1.0
+
+    batch_size = x.size(0)
+    index = torch.randperm(batch_size, device=x.device)
+
+    mixed_x = lam * x + (1 - lam) * x[index]
+    y_a, y_b = y, y[index]
+    return mixed_x, y_a, y_b, lam
+
+
+def mixup_criterion(criterion, pred, y_a, y_b, lam):
+    """MixUp 损失：两路损失的加权和"""
+    return lam * criterion(pred, y_a) + (1 - lam) * criterion(pred, y_b)
+
+
 def train_one_epoch(model, loader, criterion, optimizer):
     model.train()
     running_loss = 0.0
@@ -175,16 +186,32 @@ def train_one_epoch(model, loader, criterion, optimizer):
     for images, labels in pbar:
         images, labels = images.to(DEVICE), labels.to(DEVICE)
 
+        # MixUp
+        if MIXUP_ALPHA > 0:
+            images, labels_a, labels_b, lam = mixup_data(images, labels, MIXUP_ALPHA)
+            mixed = True
+        else:
+            mixed = False
+
         optimizer.zero_grad()
         outputs = model(images)
-        loss = criterion(outputs, labels)
+
+        if mixed:
+            loss = mixup_criterion(criterion, outputs, labels_a, labels_b, lam)
+            # 准确率用原始 labels 估算
+            _, preds = torch.max(outputs, 1)
+            correct += (lam * (preds == labels_a).float() +
+                        (1 - lam) * (preds == labels_b).float()).sum().item()
+        else:
+            loss = criterion(outputs, labels)
+            _, preds = torch.max(outputs, 1)
+            correct += (preds == labels).sum().item()
+
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
 
         running_loss += loss.item() * images.size(0)
-        _, preds = torch.max(outputs, 1)
-        correct += (preds == labels).sum().item()
         total += labels.size(0)
 
         pbar.set_postfix(loss=f"{loss.item():.3f}",
