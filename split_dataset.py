@@ -23,6 +23,30 @@ ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".gif", ".webp"}
 random.seed(RANDOM_SEED)
 
 
+def find_dataset_root(root_dir):
+    """自动探测实际的类别文件夹层级（处理嵌套目录）"""
+    exclude = {"train", "val", "test", "__MACOSX"}
+    subdirs = [d for d in os.listdir(root_dir)
+               if os.path.isdir(os.path.join(root_dir, d)) and d not in exclude]
+
+    if len(subdirs) == 0:
+        return root_dir  # 没有子目录，原样返回
+
+    # 检查当前层级是否直接包含图片（即这就是类别文件夹层级）
+    for d in subdirs[:3]:  # 抽样检查前3个
+        for f in os.listdir(os.path.join(root_dir, d)):
+            if os.path.splitext(f)[1].lower() in ALLOWED_EXTENSIONS:
+                return root_dir  # 已找到类别文件夹
+
+    # 当前层级没有图片，可能是外层包裹目录，尝试深入一层
+    if len(subdirs) == 1:
+        inner = os.path.join(root_dir, subdirs[0])
+        print(f"自动探测: 进入子目录 '{subdirs[0]}'")
+        return find_dataset_root(inner)
+
+    return root_dir
+
+
 def get_class_folders(root_dir):
     """获取所有类别文件夹名（排除 train/val 等非类别目录）"""
     exclude = {"train", "val", "test"}
@@ -44,14 +68,16 @@ def get_image_files(class_dir):
 
 
 def split_and_copy():
-    class_folders = get_class_folders(DATASET_DIR)
+    actual_dir = find_dataset_root(DATASET_DIR)
+    print(f"数据集根目录: {actual_dir}")
+    class_folders = get_class_folders(actual_dir)
     print(f"发现 {len(class_folders)} 个类别文件夹\n")
 
     total_train = 0
     total_val = 0
 
     for cls in class_folders:
-        cls_src = os.path.join(DATASET_DIR, cls)
+        cls_src = os.path.join(actual_dir, cls)
         images = get_image_files(cls_src)
 
         if len(images) == 0:
