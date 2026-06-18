@@ -3,9 +3,17 @@ import shutil
 import random
 
 # ============ 配置区 ============
-DATASET_DIR = "dataset"            # 原始数据集目录
-TRAIN_DIR = "dataset/train"        # 训练集输出目录
-VAL_DIR = "dataset/val"            # 验证集输出目录
+IS_KAGGLE = os.environ.get("KAGGLE_KERNEL_RUN_TYPE", "") != ""
+
+if IS_KAGGLE:
+    DATASET_DIR = "/kaggle/input/datasets/shrutisaxena/yoga-pose-image-classification-dataset"
+    TRAIN_DIR = "/kaggle/working/dataset/train"
+    VAL_DIR = "/kaggle/working/dataset/val"
+else:
+    DATASET_DIR = "dataset"
+    TRAIN_DIR = "dataset/train"
+    VAL_DIR = "dataset/val"
+
 TRAIN_RATIO = 0.8                  # 训练集占比（0.8 = 80%训练，20%验证）
 RANDOM_SEED = 42                   # 随机种子，保证结果可复现
 MOVE_MODE = False                  # True=移动文件, False=复制文件

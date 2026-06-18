@@ -5,19 +5,28 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
-from torchvision.transforms import v2
 from tqdm import tqdm
 
 # ==================== 配置区 ====================
-TRAIN_DIR = "dataset/train"
-VAL_DIR = "dataset/val"
+IS_KAGGLE = os.environ.get("KAGGLE_KERNEL_RUN_TYPE", "") != ""
+
+if IS_KAGGLE:
+    TRAIN_DIR = "/kaggle/working/dataset/train"
+    VAL_DIR = "/kaggle/working/dataset/val"
+    SAVE_DIR = "/kaggle/working/checkpoints"
+    NUM_WORKERS = 2
+else:
+    TRAIN_DIR = "dataset/train"
+    VAL_DIR = "dataset/val"
+    SAVE_DIR = "checkpoints"
+    NUM_WORKERS = 4
+
 NUM_CLASSES = 98
 BATCH_SIZE = 64
-EPOCHS = 2  # 测试后改回 50
+EPOCHS = 50
 LEARNING_RATE = 1e-3
 IMG_SIZE = 224
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-SAVE_DIR = "checkpoints"
 # ===============================================
 
 
@@ -186,9 +195,9 @@ def main():
     print(f"训练样本: {len(train_dataset)}, 验证样本: {len(val_dataset)}")
 
     train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE,
-                              shuffle=True, num_workers=4, pin_memory=True)
+                              shuffle=True, num_workers=NUM_WORKERS, pin_memory=True)
     val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE,
-                            shuffle=False, num_workers=4, pin_memory=True)
+                            shuffle=False, num_workers=NUM_WORKERS, pin_memory=True)
 
     # 模型、损失函数、优化器
     model = YogaCNN(num_classes=len(train_dataset.classes)).to(DEVICE)

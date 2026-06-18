@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(git init *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(gh auth *)",
+      "Bash(winget install *)",
+      "Bash(git commit -m 'feat: yoga pose CNN training pipeline *)",
+      "Bash(gh repo *)"
     ]
   }
 }
