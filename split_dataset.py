@@ -1,0 +1,88 @@
+import os
+import shutil
+import random
+
+# ============ 配置区 ============
+DATASET_DIR = "dataset"            # 原始数据集目录
+TRAIN_DIR = "dataset/train"        # 训练集输出目录
+VAL_DIR = "dataset/val"            # 验证集输出目录
+TRAIN_RATIO = 0.8                  # 训练集占比（0.8 = 80%训练，20%验证）
+RANDOM_SEED = 42                   # 随机种子，保证结果可复现
+MOVE_MODE = False                  # True=移动文件, False=复制文件
+ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".gif", ".webp"}
+# ===============================
+
+random.seed(RANDOM_SEED)
+
+
+def get_class_folders(root_dir):
+    """获取所有类别文件夹名（排除 train/val 等非类别目录）"""
+    exclude = {"train", "val", "test"}
+    return sorted([
+        d for d in os.listdir(root_dir)
+        if os.path.isdir(os.path.join(root_dir, d)) and d not in exclude
+    ])
+
+
+def get_image_files(class_dir):
+    """获取文件夹下所有图片文件"""
+    files = []
+    for f in os.listdir(class_dir):
+        if os.path.isfile(os.path.join(class_dir, f)):
+            ext = os.path.splitext(f)[1].lower()
+            if ext in ALLOWED_EXTENSIONS:
+                files.append(f)
+    return files
+
+
+def split_and_copy():
+    class_folders = get_class_folders(DATASET_DIR)
+    print(f"发现 {len(class_folders)} 个类别文件夹\n")
+
+    total_train = 0
+    total_val = 0
+
+    for cls in class_folders:
+        cls_src = os.path.join(DATASET_DIR, cls)
+        images = get_image_files(cls_src)
+
+        if len(images) == 0:
+            print(f"[跳过] {cls} — 没有图片文件")
+            continue
+
+        # 随机打乱
+        random.shuffle(images)
+
+        # 分割
+        n_train = max(1, int(len(images) * TRAIN_RATIO))
+        train_files = images[:n_train]
+        val_files = images[n_train:]
+
+        # 创建目标文件夹并复制/移动文件
+        for split_dir, files, label in [
+            (TRAIN_DIR, train_files, "train"),
+            (VAL_DIR, val_files, "val")
+        ]:
+            dst_cls = os.path.join(split_dir, cls)
+            os.makedirs(dst_cls, exist_ok=True)
+            for f in files:
+                src = os.path.join(cls_src, f)
+                dst = os.path.join(dst_cls, f)
+                if MOVE_MODE:
+                    shutil.move(src, dst)
+                else:
+                    shutil.copy2(src, dst)
+
+        print(f"{cls}: {len(train_files)} train | {len(val_files)} val")
+        total_train += len(train_files)
+        total_val += len(val_files)
+
+    print(f"\n========== 完成 ==========")
+    print(f"训练集总计: {total_train} 张")
+    print(f"验证集总计: {total_val} 张")
+    print(f"训练集路径: {TRAIN_DIR}/")
+    print(f"验证集路径: {VAL_DIR}/")
+
+
+if __name__ == "__main__":
+    split_and_copy()
