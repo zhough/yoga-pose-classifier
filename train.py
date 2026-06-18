@@ -35,6 +35,7 @@ EPOCHS = 150                              # 更多迭代
 LEARNING_RATE = 3e-2                      # SGD 从零训练 CNN 常用 0.01~0.1
 IMG_SIZE = 160                            # 降分辨率，减少过拟合，加速训练
 MODEL_NAME = "yoga_cnn"                   # "yoga_cnn" / "resnet50" / "resnet18"
+MODEL_SCALE = 1.0               # 模型缩放因子: 0.5=小型, 1.0=标准, 2.0=大型
 WEIGHT_DECAY = 1e-3
 MOMENTUM = 0.9
 LABEL_SMOOTHING = 0.1
@@ -122,26 +123,27 @@ class ConvBlock(nn.Module):
 class YogaCNN(nn.Module):
     """带残差连接的 CNN 用于瑜伽体式分类"""
 
-    def __init__(self, num_classes=NUM_CLASSES):
+    def __init__(self, num_classes=NUM_CLASSES, scale=MODEL_SCALE):
         super().__init__()
+        c = lambda x: int(x * scale)  # 通道缩放
 
         self.stem = nn.Sequential(
-            nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False),
-            nn.BatchNorm2d(64),
+            nn.Conv2d(3, c(64), kernel_size=7, stride=2, padding=3, bias=False),
+            nn.BatchNorm2d(c(64)),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(3, 2, 1),
         )
 
-        self.block1 = ConvBlock(64, 64, dropout=0.0)
-        self.block2 = ConvBlock(64, 128, dropout=0.1)
-        self.block3 = ConvBlock(128, 256, dropout=0.2)
-        self.block4 = ConvBlock(256, 512, dropout=0.2)
+        self.block1 = ConvBlock(c(64), c(64), dropout=0.0)
+        self.block2 = ConvBlock(c(64), c(128), dropout=0.1)
+        self.block3 = ConvBlock(c(128), c(256), dropout=0.2)
+        self.block4 = ConvBlock(c(256), c(512), dropout=0.2)
 
         self.gap = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc1 = nn.Linear(512, 256)
-        self.bn_fc = nn.BatchNorm1d(256)
+        self.fc1 = nn.Linear(c(512), c(256))
+        self.bn_fc = nn.BatchNorm1d(c(256))
         self.drop_fc = nn.Dropout(0.5)
-        self.fc2 = nn.Linear(256, num_classes)
+        self.fc2 = nn.Linear(c(256), num_classes)
 
     def forward(self, x):
         x = self.stem(x)
@@ -262,7 +264,7 @@ def main():
     # 模型
     num_classes = len(train_dataset.classes)
     if MODEL_NAME == "yoga_cnn":
-        model = YogaCNN(num_classes=num_classes)
+        model = YogaCNN(num_classes=num_classes, scale=MODEL_SCALE)
     else:
         from torchvision import models
         weights = getattr(models, {
@@ -301,9 +303,10 @@ def main():
 
         swanlab.init(
             project="yoga-pose-classifier",
-            experiment_name="cnn_baseline",
+            experiment_name=f"scale{int(MODEL_SCALE*100)}",
             config={
                 "architecture": MODEL_NAME,
+                "model_scale": MODEL_SCALE,
                 "num_classes": len(train_dataset.classes),
                 "batch_size": BATCH_SIZE,
                 "epochs": EPOCHS,
