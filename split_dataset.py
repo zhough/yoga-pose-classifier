@@ -9,12 +9,16 @@ if IS_KAGGLE:
     DATASET_DIR = "/kaggle/input/datasets/shrutisaxena/yoga-pose-image-classification-dataset"
     TRAIN_DIR = "/kaggle/working/dataset/train"
     VAL_DIR = "/kaggle/working/dataset/val"
+    TEST_DIR = "/kaggle/working/dataset/test"
 else:
     DATASET_DIR = "dataset"
     TRAIN_DIR = "dataset/train"
     VAL_DIR = "dataset/val"
+    TEST_DIR = "dataset/test"
 
-TRAIN_RATIO = 0.8                  # 训练集占比（0.8 = 80%训练，20%验证）
+TRAIN_RATIO = 0.7                  # 训练集占比
+VAL_RATIO = 0.15                   # 验证集占比
+TEST_RATIO = 0.15                  # 测试集占比
 RANDOM_SEED = 42                   # 随机种子，保证结果可复现
 MOVE_MODE = False                  # True=移动文件, False=复制文件
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".gif", ".webp"}
@@ -75,6 +79,7 @@ def split_and_copy():
 
     total_train = 0
     total_val = 0
+    total_test = 0
 
     for cls in class_folders:
         cls_src = os.path.join(actual_dir, cls)
@@ -84,18 +89,18 @@ def split_and_copy():
             print(f"[跳过] {cls} — 没有图片文件")
             continue
 
-        # 随机打乱
         random.shuffle(images)
 
-        # 分割
         n_train = max(1, int(len(images) * TRAIN_RATIO))
+        n_val = max(1, int(len(images) * VAL_RATIO))
         train_files = images[:n_train]
-        val_files = images[n_train:]
+        val_files = images[n_train:n_train + n_val]
+        test_files = images[n_train + n_val:]
 
-        # 创建目标文件夹并复制/移动文件
-        for split_dir, files, label in [
-            (TRAIN_DIR, train_files, "train"),
-            (VAL_DIR, val_files, "val")
+        for split_dir, files in [
+            (TRAIN_DIR, train_files),
+            (VAL_DIR, val_files),
+            (TEST_DIR, test_files),
         ]:
             dst_cls = os.path.join(split_dir, cls)
             os.makedirs(dst_cls, exist_ok=True)
@@ -107,15 +112,18 @@ def split_and_copy():
                 else:
                     shutil.copy2(src, dst)
 
-        print(f"{cls}: {len(train_files)} train | {len(val_files)} val")
+        print(f"{cls}: {len(train_files)} train | {len(val_files)} val | {len(test_files)} test")
         total_train += len(train_files)
         total_val += len(val_files)
+        total_test += len(test_files)
 
     print(f"\n========== 完成 ==========")
     print(f"训练集总计: {total_train} 张")
     print(f"验证集总计: {total_val} 张")
+    print(f"测试集总计: {total_test} 张")
     print(f"训练集路径: {TRAIN_DIR}/")
     print(f"验证集路径: {VAL_DIR}/")
+    print(f"测试集路径: {TEST_DIR}/")
 
 
 if __name__ == "__main__":
