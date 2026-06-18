@@ -32,8 +32,9 @@ else:
 NUM_CLASSES = 98
 BATCH_SIZE = 64
 EPOCHS = 50
-LEARNING_RATE = 1e-3
+LEARNING_RATE = 1e-4        # 预训练模型用更小的学习率
 IMG_SIZE = 224
+MODEL_NAME = "resnet50"     # "resnet50" / "resnet18" / "yoga_cnn"
 
 
 def get_device():
@@ -229,9 +230,22 @@ def main():
     val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE,
                             shuffle=False, num_workers=NUM_WORKERS, pin_memory=True)
 
-    # 模型、损失函数、优化器
-    model = YogaCNN(num_classes=len(train_dataset.classes)).to(DEVICE)
-    criterion = nn.CrossEntropyLoss()
+    # 模型
+    num_classes = len(train_dataset.classes)
+    if MODEL_NAME == "yoga_cnn":
+        model = YogaCNN(num_classes=num_classes)
+    else:
+        from torchvision import models
+        weights = getattr(models, {
+            "resnet18": "ResNet18_Weights",
+            "resnet50": "ResNet50_Weights",
+        }[MODEL_NAME]).DEFAULT
+        model = getattr(models, MODEL_NAME)(weights=weights)
+        in_features = model.fc.in_features
+        model.fc = nn.Linear(in_features, num_classes)
+
+    model = model.to(DEVICE)
+    criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, mode="min", factor=0.5, patience=5
@@ -259,7 +273,7 @@ def main():
             project="yoga-pose-classifier",
             experiment_name="cnn_baseline",
             config={
-                "architecture": "YogaCNN",
+                "architecture": MODEL_NAME,
                 "num_classes": len(train_dataset.classes),
                 "batch_size": BATCH_SIZE,
                 "epochs": EPOCHS,
