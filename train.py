@@ -389,21 +389,6 @@ def main():
         for cls in train_dataset.classes:
             f.write(cls + "\n")
 
-    # ============ 测试集评估 ============
-    if os.path.isdir(TEST_DIR):
-        print("\n========== 测试集评估 ==========")
-        test_dataset = datasets.ImageFolder(TEST_DIR, transform=val_transforms)
-        test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE,
-                                 shuffle=False, num_workers=NUM_WORKERS, pin_memory=True)
-        # 加载最佳模型
-        ckpt = torch.load(os.path.join(SAVE_DIR, "best_model.pth"),
-                          map_location=DEVICE, weights_only=False)
-        model.load_state_dict(ckpt["model_state_dict"])
-        test_loss, test_acc = validate(model, test_loader, criterion)
-        print(f"测试集 Loss: {test_loss:.4f} | 测试集 Acc: {test_acc:.4f}")
-        if SWANLAB_AVAILABLE:
-            swanlab.log({"test/loss": test_loss, "test/acc": test_acc})
-
     # 结束 SwanLab
     if SWANLAB_AVAILABLE:
         swanlab.finish()
