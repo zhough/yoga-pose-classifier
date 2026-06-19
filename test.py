@@ -158,11 +158,21 @@ def main():
 
     print(f"\n========== 测试结果 ==========")
     print(f"测试集 Loss: {test_loss:.4f}")
-    print(f"测试集 Acc:  {test_acc:.4f} ({correct}/{total})")
+    print(f"测试集 Acc:  {test_acc:.4f} ({sum(p == l for p, l in zip(preds, labels))}/{len(preds)})")
 
     # SwanLab
     if SWANLAB_AVAILABLE:
-        swanlab.login(api_key=os.environ.get("SWANLAB_API_KEY", ""))
+        api_key = ""
+        try:
+            from kaggle_secrets import UserSecretsClient
+            api_key = UserSecretsClient().get_secret("SWANLAB_API_KEY")
+        except Exception:
+            pass
+        if not api_key:
+            api_key = os.environ.get("SWANLAB_API_KEY", "")
+        if api_key:
+            swanlab.login(api_key=api_key)
+
         swanlab.init(
             project="yoga-pose-classifier",
             experiment_name=f"scale{int(MODEL_SCALE*100)}_test",
