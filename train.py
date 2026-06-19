@@ -41,7 +41,7 @@ MODEL_SCALE = 1.5               # 模型缩放因子: 0.5=小型, 1.0=标准, 2.
 WEIGHT_DECAY = 1e-3
 MOMENTUM = 0.9
 LABEL_SMOOTHING = 0.1
-MIXUP_ALPHA = 0            # MixUp 强度，0=关闭
+MIXUP_ALPHA = 0.2          # MixUp 强度，0=关闭
 
 
 def get_device():
@@ -304,7 +304,7 @@ def main():
 
         swanlab.init(
             project="yoga-pose-classifier",
-            experiment_name=f"scale{int(MODEL_SCALE*100)}",
+            experiment_name=f"scale{int(MODEL_SCALE*100)}_mixup",
             config={
                 "architecture": MODEL_NAME,
                 "model_scale": MODEL_SCALE,
