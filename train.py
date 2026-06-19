@@ -33,7 +33,7 @@ else:
 
 NUM_CLASSES = 98
 BATCH_SIZE = 64
-EPOCHS = 120
+EPOCHS = 140
 LEARNING_RATE = 3e-2                      # SGD 从零训练 CNN 常用 0.01~0.1
 IMG_SIZE = 160                            # 降分辨率，减少过拟合，加速训练
 MODEL_NAME = "yoga_cnn"                   # "yoga_cnn" / "resnet50" / "resnet18"
